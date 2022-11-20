@@ -1,0 +1,252 @@
+### 定義
+
+在不破壞封裝的前提下，捕獲一個對象的內部狀態，並在該對象之外保存這個狀態，這樣可以在以後將對象恢復到原先保存的狀態。
+
+### 角色
+
+1. 發起人(Originator)：可以創建一個備忘錄，並儲存當前的內部狀態，也可以用備忘錄來恢復其內部的狀態，一般會將需要保存內部狀態的class設計為originator
+2. 備忘錄(Memento)：儲存發起人內部的狀態。
+3. 管理者(Caretaker)Client端，負責保存備忘錄。要求originator恢復狀態的呼叫方。
+
+### 範例
+
+```swift
+struct BankEntry {
+		let id: Int
+		let amount: Flout
+}
+// 無需定義方法，因為他的實作細節是私有的，協定的作用是產出memento的物件
+protocol Memento { }
+
+protocol Originator {
+		func createMemo() -> Memento
+		func applyMemo(memo: Memento)
+}
+
+class BankOriginator: Originator {
+		var entrys = [Int: BankEntry]()
+		var nextID = 1
+		var total = 0
+
+		/// 增加帳戶
+		func addEntry(id: Int, amount: Float) {
+				let entry = BankEntry(id: id, amount: amount)
+				self.entrys[entry.id] = entry
+				total += amount
+				nextID += 1
+		}
+
+		/// 創建備忘錄
+		func createMemo() -> Memento {
+				return BankMemo(org: self)
+		}
+
+		/// 調用備忘錄，進行恢復
+		func applyMemo(memo: Memento) {
+				memo.apply(org: self)
+		}
+
+		func printEntrys() {
+				print("金額為\(self.total)")
+		}
+}
+
+class BankMemo: Memento {
+		var entrys = [BankEntry]
+
+		private var nextID = 1
+		
+		private var total: Float = 0
+
+		init(org: BankOriginator) {
+				for item in org.entrys.values {
+						self.entrys.append(item)
+				}
+				self.nextID = org.nextID
+				self.total = org.total
+		}
+
+		func apply(org: BankOriginator) {
+				org.total = self.total
+				org.nextID = self.nextID
+				for item in self.entrys {
+						org.entrys[item.id] = item
+				}
+		}
+}
+
+let org = BankOriginator()
+
+org.addEntry(id: 1, amount: 3000)
+org.addEntry(id: 2, amount: 2000)
+
+let memo = org.createMemo()
+org.addEntry(id: 3, amount: 2000)
+org.addEntry(id: 4, amount: 2000)
+
+org.printEntry()
+
+org.applyMemo(memo: memo)
+org.printEntry()
+
+// 金額為 9000
+// 金額為 5000
+```
+
+![structure2-indexed-2x.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9d59d07c-ab8b-4085-8060-24e8fcedb0c2/structure2-indexed-2x.png)
+
+### 缺點
+
+1. 如果過於頻繁的創建，會消耗大量的ram
+
+### [類似的設計模式-Command](https://blog.csdn.net/ZCMUCZX/article/details/81159862)
+
+備忘錄模式是能夠操作整個過程，隨時可以進行恢復。命令模式操作是一步一步進行撤銷操作的。
+
+[command 範例1](https://blog.csdn.net/ZCMUCZX/article/details/81159862)
+
+- Command 範例2
+    
+    ```swift
+    protocol Memento {
+        var name: String { get }
+        var date: Date { get }
+    }
+    
+    class ConcreteMemento: Memento {
+    
+        private(set) var state: String
+        private(set) var date: Date
+    
+        init(state: String) {
+            self.state = state
+            self.date = Date()
+        }
+    
+        var name: String { 
+    				return state + " " + date.description.suffix(14).prefix(8)
+    		}
+    }
+    
+    class Originator {
+    		private var state: String
+    
+    		init(state: String) {
+    				self.state = state
+    				print("Originator: My initial state is: \(state)")
+    		}
+    
+    		func doSomething() {
+            print("Originator: I'm doing something important.")
+            state = generateRandomString()
+            print("Originator: and my state has changed to: \(state)")
+        }
+    
+    		private func generateRandomString() -> String {
+            return String(UUID().uuidString.suffix(4))
+        }
+    
+    		/// 把目前的狀態存進memento
+        func save() -> Memento {
+            return ConcreteMemento(state: state)
+        }
+    
+    		/// 從memento恢復狀態
+    		func restore(memento: Memento) {
+            guard let memento = memento as? ConcreteMemento else { return }
+            self.state = memento.state
+            print("Originator: My state has changed to: \(state)")
+        }
+    }
+    
+    class Caretaker {
+    
+        private lazy var mementos = [Memento]()
+        private var originator: Originator
+    
+        init(originator: Originator) {
+            self.originator = originator
+        }
+    
+        func backup() {
+            print("\nCaretaker: Saving Originator's state...\n")
+            mementos.append(originator.save())
+        }
+    
+        func undo() {
+    
+            guard !mementos.isEmpty else { return }
+            let removedMemento = mementos.removeLast()
+    
+            print("Caretaker: Restoring state to: " + removedMemento.name)
+            originator.restore(memento: removedMemento)
+        }
+    
+        func showHistory() {
+            print("Caretaker: Here's the list of mementos:\n")
+            mementos.forEach({ print($0.name) })
+        }
+    }
+    
+    let originator = Originator(state: "Super-duper-super-puper-super.")
+    let caretaker = Caretaker(originator: originator)
+    
+    caretaker.backup()
+    originator.doSomething()
+    
+    caretaker.backup()
+    originator.doSomething()
+    
+    caretaker.backup()
+    originator.doSomething()
+    
+    caretaker.showHistory()
+    
+    caretaker.undo()
+    
+    caretaker.undo()
+    
+    // Originator: My initial state is: Super-duper-super-puper-super.
+    
+    // Caretaker: Saving Originator's state...
+    
+    // Originator: I'm doing something important.
+    // Originator: and my state has changed to: 1923
+    
+    // Caretaker: Saving Originator's state...
+    
+    // Originator: I'm doing something important.
+    // Originator: and my state has changed to: 74FB
+    
+    // Caretaker: Saving Originator's state...
+    
+    // Originator: I'm doing something important.
+    // Originator: and my state has changed to: 3681
+    
+    // Caretaker: Here's the list of mementos:
+    
+    // Super-duper-super-puper-super. 11:45:44
+    // 1923 11:45:44
+    // 74FB 11:45:44
+    
+    // Caretaker: Restoring state to: 74FB 11:45:44
+    // Originator: My state has changed to: 74FB
+    
+    // Caretaker: Restoring state to: 1923 11:45:44
+    // Originator: My state has changed to: 1923
+    ```
+    
+
+### Cocoa
+
+**CoreData & Codable**
+
+iOS app 通常使用`Encoder`將 originator 的狀態編碼爲 memento，使用`Decoder`解碼 memento 還原給 originator。這允許編碼、解碼邏輯在 originator 之間複用。例如，`JSONEncoder`和`JSONDecoder`能夠把對象編碼爲 JSON 格式數據，並解碼還原。
+
+### References
+
+[https://refactoringguru.cn/design-patterns/memento/swift/example](https://refactoringguru.cn/design-patterns/memento/swift/example)
+
+[https://refactoring.guru/design-patterns/memento](https://refactoring.guru/design-patterns/memento)
+
+[https://www.codenong.com/js82663402aeff/](https://www.codenong.com/js82663402aeff/)
