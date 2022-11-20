@@ -1,0 +1,293 @@
+### 定義
+
+藉由mediator作為中間人，簡化物件之間的溝通。
+
+### 範例
+
+```swift
+struct Position {
+		var distanceFromrunway: Int
+}
+
+// 同類物件共同的protocol
+protocol Peer {
+		var name: String
+		func otherPlaneDidChangePosition(position: Position) -> Bool
+}
+
+protocol Mediator {
+		func registerPeer(peer: Peer)
+		func unregisterPeer(peer: Peer)
+		func changePosition(peer: Peer, position: Position) -> Bool
+}
+
+class AirplaneMediator: Mediator {
+		private var peers: [String: Peer]
+		
+		func registerPeer(peer: Peer) {
+				self.peers[peer.name] = peer
+		}
+		
+		func unregisterPeer() {
+				self.peers.removeValueForKeys(peer.name)		
+    }
+
+		func changePosition(peer: Peer, position: Position) {
+				for storedPeer in peers.values {
+						if (peer.name != storedPeer.name && storedPeer.otherPlaneDidChangePosition(position)) {
+								return true
+						}
+				}
+				return false
+		}
+}
+
+class Airplane: Peer {
+		var name: String
+		var currentPosition: Position
+		var mediator: Mediator
+
+		init(name: String, initPosition: Position, mediator: Mediator) {
+				self.name = name
+				self.currentPosition = initPosition
+				self.mediator = mediator
+				mediator.registerPeer(self)
+		}
+
+   func otherPlaneDidChangePostion(position: Position) -> Bool {
+			return position.distanceFromRunway == self.currentPosition.distanceFromRunway
+	}
+
+	func changePosition(newPosition: Position) {
+			self.currentPosition = newPosition
+			if (mediator.changePosition(self, position: self.currentPosition) == true) {
+					print("too close")
+					return
+			}
+			print("position changed")
+	}
+
+	func land() {
+			self.currentPosition = Position(distanceFromRunway: 0)
+			mediator.unregisterPeer(self)
+			print("\(name): Landed")
+		}
+}
+
+// 實作
+let mediator = AirplaneMediator()
+// 第一架飛機-英國航空
+let british = Airplane(name: "BA706", initPosition: Position(distanceFromRunway: 11), mediator: mediator)
+// 第二架飛機-美國航空
+let american = Airplane(name: "AA101", initPosition: Position(distanceFromRunway: 12), mediator: mediator)
+
+//英國航空要接近機場
+british.changPosition(Position(distanceFromRunway: 8))
+british.changPosition(Position(distanceFromRunway: 2))
+british.changPosition(Position(distanceFromRunway: 1))
+
+// 新飛機抵達
+let cathay = Airplane(name: "CX200", initPosition: Position(distanceFromRunway: 13), mediator: mediator)
+
+// 英國航空-著陸
+british.land()
+
+// 國泰航空改變位置
+cathay.changePosition(Position(distanceFromRunway: 12))
+
+// output
+// BA706: Position changed
+// BA706: Position changed
+// BA706: Position changed
+// BA706: Landed
+// CX200: Too close!
+```
+
+### 解決什麼問題
+
+同類對象之間的通信問題
+
+### 優點
+
+1. 專注於本身的狀態，依靠mediator來管理與其他同儕的關係
+2. 中介者使各物件不需要顯式地相互引用，從而使其耦合鬆散，而且可以獨立地改變它們之間的互動。中介者模式又稱為調停者模式，它是一種物件行為型模式。
+
+### 何時該避免使用
+
+如果需要讓一個對象給一組互不相關的對象發送通知時，則應該使用觀察者模式。
+
+### 常見陷阱
+
+1. mediator不能提供其他物件的存取給其同儕，否則會產生相依性。
+2. 同儕與mediator不應該使用共同的協定，這樣同儕會不知道有mediator的介入，導致程式碼的混亂。他們應該分別使用獨立的協定。
+
+### 延伸：實作同時性保護（GCD）
+
+```swift
+class AirplaneMediator: Mediator {
+		private var peers: [String: Peer] = []
+		private let queue = DispatchQueue(label: "dictQ", attributes: .concurrent)
+		
+		func registerPeer(peer: Peer) {
+			queue.sync(flags: .barrier){ _ in
+						self.peers[peer.name] = peer
+				}
+		}
+
+		func unregisterPeer(peer: Peer, position: Position) -> Bool {
+				var result = false
+				queue.sync {
+						for storedPeer in self.peer.values {
+								if (peer.name != storedPeer.name && storedPeer.otherPlaneDidChangePosition(position) {
+										result = true
+								}
+						}
+				}
+				return false
+		}
+}
+```
+
+要做到可以同時讀取peers的資料，就需要用GCD的dispatchSync的讀取操作，來保證安全。
+
+### 延伸：Mediator的變化
+
+mediator專注於管理同儕間的關係,讓mediator定義同儕要對應做的事情
+
+### Command Mediator
+
+mediator會叫用命令，傳遞給每個同儕command物件的execute方法。
+
+```swift
+protocol CommandPeer {
+		var name: String
+}
+
+class Command {
+		let function: CommandPeer -> Any
+
+		init(function: CommendPeer -> Any) {
+				self.function = function
+		}
+		
+		func execute(peer: CommendPeer) -> Any {
+				return function(peer)
+		}
+}
+
+class CommandMediator [
+
+		private var peers = [String: CommandPeer]
+
+		func registerPeer(peer: CommandPeer) {
+				peers[peer.mame] = peer
+		}
+
+		func unregisterPeer(peer: CommandPeer) {
+				peers.removeValueForKey(peer.name)
+		}
+
+		func dispatchCommand(caller: CommandPeer, command: Command) -> [Any] {
+				var results = [Any]
+				for peer in peers.value {
+						if peer.name != caller.name {
+								results.append(command.execute(peer))
+						}
+				}
+				return results
+		}
+}
+
+class Airplane: CommandPeer {
+
+			var mediator: CommandMediator
+			.....
+
+			func changePosition(newPosition: Position) {
+					let c = Command(function: { peer in
+							if let plane = peer as? Airplane {
+									return plane.otherPlaneDidChangePosition(self.currentPosition)
+							} else {
+									fatalError("")
+							}
+				})
+
+			let allResults = self.mediator.dispatchCommand(self, command: c)
+			for result in allResults {
+					print("\(self.name): Too close")
+					return 
+				}
+		}
+}
+
+```
+
+### MessageMediator
+
+```swift
+protocol MessagePeer {
+		var name: String
+		func handleMessage(messageType: String, data: Any?) -> Any?
+}
+
+class MessageMediator {
+		private var peers = [String: MessageType]
+
+		func registerPeer(peer: MessagePeer) {
+				peers[peer.name] = peer
+		}
+
+		func unregisterPeer(peer: MessagePeer) {
+				peers.removeValueForKey(peer.name)
+		} 
+
+		func sendMessage(caller: MessagePeer, messageType: String, data: Any) -> [Any] {
+				var results = [Any]
+				for peer in peers.values {
+						if (peer.name != caller.name) {
+								results.append(peer.handleMessage(messageType, data: data)
+						}
+				}
+				return results
+		}
+}
+
+func Airplane: MessagePeer {
+			.....
+			func handleMessage(messageType: String, data: Any?) -> Any? {
+					var result: Any?
+					switch (messageType) {
+							case "changePosition": 
+									result = otherPlaneDidChangePosition(date as! Position)
+							default: 
+									return nil
+					}
+					return result
+			}
+		  ......
+}
+				
+```
+
+### Cocoa中的範例
+
+NSNotificationCenter(加觀察者)
+
+MVC
+
+### [角色](https://iter01.com/513251.html)
+
+- Mediator（抽象中介者）：它定義一個介面，該介面用於與各同事物件之間進行通訊。
+- ConcreteMediator（具體中介者）：它是抽象中介者的子類，通過協調各個同事物件來實現協作行為，它維持了對各個同事物件的引用。
+- Colleague（抽象同事類）：可以是一個protocol也可以是一個class。它定義各個同事類公有的方法，並宣告瞭一些抽象方法來供子類實現，同時它維持了一個對抽象中介者類的引用，其子類可以通過該引用來與中介者通訊。
+- ConcreteColleague（具體同事類）：它是抽象同事類的子類；每一個同事物件在需要和其他同事物件通訊時，先與中介者通訊，通過中介者來間接完成與其他同事類的通訊；在具體同事類中實現了在抽象同事類中宣告的抽象方法。
+
+![Mediator_design_pattern.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/7f1997ff-4d11-4d69-a9b6-74d99bc05cba/Mediator_design_pattern.png)
+
+### references
+
+[https://ios.devdon.com/archives/52](https://ios.devdon.com/archives/52)
+
+[用繼承實作](https://refactoring.guru/design-patterns/mediator/swift/example)
+
+[GCD-Barrier](https://shoujhengduan.medium.com/ios-dispatch-barrier的比較-fd40f069cfdb)
