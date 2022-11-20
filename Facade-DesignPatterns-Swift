@@ -1,0 +1,116 @@
+### Façade /fəˈsɑːd/
+
+1. 建築物正面
+2. 假象，虛假的外表
+
+### 定義
+
+將在各處的API整合起來，簡化一般需要連續執行多個API的行為。
+
+### 範例
+
+```swift
+// 寶藏地圖
+class TreasureMap {
+		// 得到珠寶寶藏的經緯度
+		func getJewelsCoordinate() -> (lat, lng)
+		// 得到黃金寶藏的經緯度m km
+		func getGoldCoordinate() -> (lat, lng)
+}
+
+// 船
+class Ship {
+		// 讓船移動至位置
+		func moveToLocation(coordinate: Coordinate, completion: () -> Void)
+}
+
+// 船員
+class Crew {
+
+		Enum Action {
+				case .jewel
+				case .gold
+		}
+
+		// 執行找尋寶藏的行為
+		func perforAction(action: Action, completion: () -> Void)
+}
+
+// Façade
+class Facade {
+
+	private let map = TreasureMap()
+	private let ship = Ship()
+	private let crew = Crew()
+		
+
+// closure 
+	func digForGold() {
+				let coordinate = map.getGoldCoordinate()
+				ship.moveToLocation(coordinate: coordinate) {
+						crew.perforAction(action: .gold) {
+							print("挖到黃金！")
+						}
+				}
+		}
+
+// GCD
+	func searchForJewel() {
+				let semaphore = dispatch_semaphore_create(0)
+				let coordinate = map.getJewelsCoordinate()
+				ship.moveToLocation(coordinate: coordinate) {
+						dispatch_semaphore_signal(semaphore)
+				}
+				
+				dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER)
+				crew.performAction(action: .jewel) {
+						print("找到珠寶")
+				}
+		}
+}
+			
+
+// client
+let facade = Facade()
+facade.searchForJewel()
+facade.digForGold()
+```
+
+![229206011049091.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9751beb9-0b03-4489-bd54-9701099028cd/229206011049091.png)
+
+### ⚠️注意 - 透明度
+
+在實作Façade模式的時候，會有洩漏底層物件細節的陷阱，稱為透明度。注意，在建立Façade的時候就要決定他是否為透明。且，不應該因為將來可能有機會，要修改原來的code將不透明→透明，而一開始都建立為透明的。
+
+```swift
+// Façade
+class Facade {
+	// 移除private，讓外面的人可以直接取用裡面的東西
+	~~private~~ let map = TreasureMap()
+	~~private~~ let ship = Ship()
+	~~private~~ let crew = Crew()
+```
+
+### 比較
+
+整合單一元件時，不需要使用Façade模式，改用adapter
+
+### 優點
+
+1.  提高了靈活性。 
+2. 提高了安全性。
+
+### 缺點
+
+1. 不符合開閉原則，如果要改東西很麻煩，繼承或是重寫都不合適
+
+### **使用场景**
+
+1. 為複雜的模組或是類別系統提供外界訪問
+2. 預防低水平人員帶來的風險🤣
+
+### Reference
+
+[DispatchSemaphore](https://developer.apple.com/documentation/dispatch/dispatchsemaphore)
+
+[https://www.jianshu.com/p/8e55a23fedec](https://www.jianshu.com/p/8e55a23fedec)
