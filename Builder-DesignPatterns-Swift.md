@@ -12,58 +12,57 @@ NSDateComponents
 ```swift
 // 產品
 class Room {
-		var window: String
-		var floor: String
-
-		init(window: String, floor: String) {
-				self.window = window
-				self.floor = floor
-		}
+    var window: String
+    var floor: String
+    
+    init(window: String, floor: String) {
+        self.window = window
+        self.floor = floor
+    }
 }
 
 protocol Builder {
-		func makeWindow()
-		func makeFloor()
-		func getRoom() -> Room?
+    func makeWindow()
+    func makeFloor()
+    func getRoom() -> Room?
 }
 
 // director
 class Designer {
-		func commandOrder(builder: Builder) {
-				builder.makeWindow()
-				builder.makeFloor()
-		}
+    func commandOrder(builder: Builder) {
+        builder.makeWindow()
+        builder.makeFloor()
+    }
 }
 
 class ConcreteBuilder: Builder {
-		var window: String?
-		var floor: String?
-
-		func makeWindow() {
-				window = "window"
-		}
-
-		func makeFloor() {
-				floor = "floor"	
-		}
-
-		func getRoom() -> Room? {
-				if window == "window" && floor == "floor" {
-						let room = Room(window: window!, floor = floor!)
-						return room
-				}
-				return nil
-		}
+    var window: String?
+    var floor: String?
+    
+    func makeWindow() {
+        window = "window"
+    }
+    
+    func makeFloor() {
+        floor = "floor"    
+    }
+    
+    func getRoom() -> Room? {
+        if let window = window,
+           let floor = floor {
+            let room = Room(window: window, floor: floor)
+            return room
+        }else {
+            return nil
+        }
+    }
 }
-```
 
-```swift
 let concreteBuilder = ConcreteBuilder()
 let designer = Designer()
 designer.commandOrder(builder: concreteBuilder)
-if let room = concreteBuilder.getRoom() {
-		print("window \(room.window), floor: \(room.floor)"
-}
+let room = concreteBuilder.getRoom()!
+print("window: \(room.window), floor: \(room.floor)")
 ```
 
 ![015117_9VOb_2003960.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/e77ccb60-1e45-41ac-9b60-724c3c9640a4/015117_9VOb_2003960.png)
