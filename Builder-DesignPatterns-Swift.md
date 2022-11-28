@@ -6,6 +6,18 @@
 ### Cocoa 中的範例
 
 NSDateComponents
+```swift
+var dateComponents = DateComponents()
+dateComponents.year = 1997
+dateComponents.month = 1
+dateComponents.day = 1
+dateComponents.hour = 15
+dateComponents.minute = 15
+dateComponents.second = 15
+
+print(dateComponents)
+//PRINT: year: 1997 month: 1 day: 1 hour: 15 minute: 15 second: 15 isLeapMonth: false 
+```
 
 ### 範例
 
